@@ -2,7 +2,7 @@ set term postscript eps font "Times-Roman,24"  size 10in,5in
 filename = "breathing_rf_face_up_omni"
 set output "Omni.eps"
 
-set multiplot layout 2, 1 title "Omni"
+set multiplot layout 2, 1
 
 set title "Raw RSS"
 unset key
@@ -25,4 +25,4 @@ plot filename.".txt" using ($9-start):($2 != 127 ? $2 : 1/0) title '1st Channel'
 set title "Breathing Estimation"
 unset key
 set ylabel "BPM"
-plot "output_omni.txt" using ($1-start):2 title 'BPM' with lines ls 1 lc 5 lw 1 
+plot "output_face_up_omni.txt" using ($1-start):2 title 'BPM' with lines ls 1 lc 5 lw 1 

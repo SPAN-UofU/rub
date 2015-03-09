@@ -6,6 +6,7 @@ import time
 from collections import deque
 import matplotlib.pyplot as plt
 import matplotlib
+import collections, itertools
 import scipy.stats as stats
 
 matplotlib.rc('xtick', labelsize=16)
@@ -14,7 +15,7 @@ matplotlib.rc('ytick', labelsize=16)
 plt.ion()
 
 plotOption   = False
-fileOption   = False
+fileOption   = True
 
 # Plot highest link lines
 def plotHighestLinkLines(topInds, nodeLocs, channels):
@@ -51,55 +52,13 @@ def plotHighestLinks(rssDataMat, value, k, start_ind):
 
     return topInds
 
-
-# Calculate the t-score, for each link, for the change in mean between
-# the past vs. future window, at each time.
-def CalcTScore(rssMat, wl, minStd):
-
-    # Calculate the mean and standard deviation of each wl-length window
-    linkchs, datalen = rssMat.shape
-    rssWinAvg   = np.empty((linkchs, datalen-wl))
-    rssWinVar   = np.empty((linkchs, datalen-wl))
-    for i in range(datalen-wl):
-        rssWinAvg[:,i] = np.mean(rssMat[:,i:i+wl], axis=1)
-        rssWinVar[:,i] = np.var(rssMat[:,i:i+wl], axis=1)
-
-    # There are two windows, one before the current time, one after.
-    # The Welch's t-test: test of a change in mean with unequal variances
-    # between the two samples:
-    twoGrpT        = np.zeros((linkchs, datalen-wl))
-    for i in range(wl, datalen-wl):
-        twoGrpStd      = np.sqrt(rssWinVar[:,i-wl] + rssWinVar[:,i])/np.sqrt(wl)
-        twoGrpStdwMin  = np.array([max(minStd, v) for v in twoGrpStd])
-        twoGrpT[:,i] = (rssWinAvg[:,i-wl] - rssWinAvg[:,i]) / twoGrpStdwMin
-
-    absTSum     = np.mean(np.abs(twoGrpT), axis=0)
-    rmsTSum     = np.sqrt(np.mean(np.abs(twoGrpT)**2, axis=0))
-    maxT        = np.abs(twoGrpT).max(axis=0)
-
-    return (absTSum, rmsTSum, twoGrpT, maxT)
-
-
-# Calculate the Mann-Whitney-Wilcoxon U statistic, for each link, for the
-# change in distribution between the past vs. future window, at each time.
-def CalcWilcoxonScore(rssMat, wl):
-
-    # Calculate the mean and standard deviation of each wl-length window
-    linkchs, datalen = rssMat.shape
-
-    # There are two windows, one before the current time, one after.
-    # The Mann-Whitney-Wilcoxon rank-sum test
-    twoGrpZ       = np.zeros((linkchs, datalen-wl))
-
-    for i in range(wl, datalen-wl):
-        for ln in range(linkchs):
-            twoGrpZ[ln,i], junk  = stats.ranksums(rssMat[ln, i-wl:i], rssMat[ln, i:i+wl])
-
-    absZSum   = np.mean(np.abs(twoGrpZ), axis=0)
-    rmsZSum   = np.sqrt(np.mean(np.abs(twoGrpZ)**2, axis=0))
-
-    return (absZSum, rmsZSum)
-
+def CalcTScoreRT(meanBuffer, varBuffer, wl, minStd):
+    links         = len(meanBuffer)
+    twoGrpStd     = [np.sqrt(varBuffer[i][-1] + varBuffer[i][0])/np.sqrt(wl) for i in range(links)]
+    twoGrpStdwMin = np.array([max(minStd, v) for v in twoGrpStd])
+    twoGrpT       = [(meanBuffer[i][-1] - meanBuffer[i][0])/ twoGrpStdwMin[i] for i in range(links)]
+    rmsTSum       = np.sqrt(np.mean(np.abs(twoGrpT)**2))
+    return rmsTSum
 
 # Subtract the mean from each row of a 2D array
 def removeMeanAndClean(rssMat, noMeastKey):
@@ -122,6 +81,17 @@ def flatten(inArray):
 
     outlen = np.prod(inArray.shape)
     return inArray.reshape(outlen,1)
+
+# Return Exponential Matrix
+def calcExpMatrix(sampling_period, N, HzRange):
+    sps          = 1.0 / sampling_period          # samples per second
+    #N            = int(round(window_s * sps))     # samples per rate estimation window
+    #incr_samp    = int(round(increment_s * sps))  # How many samples to move the window before re-estimating
+    freqRange    = (-2J * np.pi / sps)*HzRange    #normalized frequency
+    freqs        = len(freqRange)                 # How many frequencies at which DFT is calculated
+    # We'll multiply this by the data in the window to calculate PSD
+    expMat       = np.array([np.exp(freqRange*i) for i in np.arange(N)])
+    return expMat
 
 
 # Calculate BPM
@@ -153,12 +123,12 @@ def calBPM():
     plotSkip    = 1
     buffL       = 600 #30 sec
     avgL        = 100 #10 sec
-    startSkip   = 300
+    startSkip   = 1
 
 
     # Init output file
     if fileOption:
-        fout = open('output.txt', 'w')
+        fout = open('../output.txt', 'w')
 
     # remove junk from start of file.
     line = []
@@ -166,39 +136,47 @@ def calBPM():
         line    = sys.stdin.readline()
 
     # Use the most recent line to determine how many columns (streams) there are.
-    #lineInt     = [int(i) for i in line.split()]
-    #lines       = len(lineInt)
-    #databuff    = []
-    #for i in range(lines):
-    #    databuff.append( deque([0]*buffL))
-
-    # Use the most recent line to determine how many columns (streams) there are.
     lineInt = [float(i) for i in line.split()]
     columns = len(lineInt)
     streams = columns/2  # Every stream requires two columns (time, rss)
     rss     = [int(f) for f in lineInt[1::2]]  # take odd number columns
-    #times   = [int(f) for f in lineInt[0:-1:2]] # take even number columns
     timeSec = lineInt[-1]
 
     # Init the figure.
     RSSBuffer   = []
-    FBuffer = []
-    TimeBuffer   = []
+    FBuffer     = []
+    TimeBuffer  = []
     linePlot    = []
+    linePlot2   = []
+    varBuffer   = []
+    meanBuffer  = []
+    MSRBuffer   = [] # Mean subtracted rss buffer
+    wl = 14
     plt.clf()
     fig1 = plt.figure(num=1, figsize=(100, 100))
-    ax1 = fig1.add_subplot(3, 1, 1)
+    ax1 = fig1.add_subplot(4, 1, 1)
+    ax4 = fig1.add_subplot(4, 1, 2)
     for n in range(streams):
         RSSBuffer.append( deque([rss[n]] * buffL))
         TimeBuffer.append( deque([timeSec] * buffL))
+        
+        varBuffer.append( deque([0] * (wl + 1)))
+        meanBuffer.append( deque([0] * (wl + 1)))
+        MSRBuffer.append( deque([rss[n]] * buffL))
+        
         l, = ax1.plot([0]*buffL, RSSBuffer[n], label=str(n))
         ax1.set_ylim((-95, -35))
         ax1.set_ylabel('Received Power (dBm)')
         ax1.set_xlabel('Measurement Time Ago (sec)')
         linePlot.append(l)
+        
+        l, = ax4.plot([0]*buffL, MSRBuffer[n], label=str(n))
+        ax4.set_ylim((-10, 10))
+        ax4.set_ylabel('Mean Subtracted')
+        ax4.set_xlabel('Measurement Time Ago (sec)')
+        linePlot2.append(l)
 
-    #fig2 = plt.figure(2)
-    ax2 = fig1.add_subplot(3, 1, 3)
+    ax2 = fig1.add_subplot(4, 1, 4)
     FBuffer = (deque([0] * buffL))
     l, = ax2.plot([0]*buffL, FBuffer)
     ax2.set_ylim((0, 30))
@@ -206,7 +184,7 @@ def calBPM():
     ax2.set_xlabel('Measurement Time Ago (sec)')
     plotBuffer2 = l
 
-    ax3 = fig1.add_subplot(3, 1, 2)
+    ax3 = fig1.add_subplot(4, 1, 3)
     FBuffer2 = (deque([0] * len(HzRange)))
     freq, = ax3.plot(HzRange, FBuffer2)
     maxFreq, = ax3.plot(0, 0,'ro')
@@ -214,7 +192,6 @@ def calBPM():
     ax3.set_ylim((0, 30))
     ax3.set_xlabel('Frequency (Hz)')
     ax3.set_ylabel('Normalized Average PSD')
-    
 
     # Init fHat and fError array
     fHat           = deque([])
@@ -223,6 +200,8 @@ def calBPM():
     # Pipe listenSomeLinks_v2.py output to this code.
     # Run forever, adding lines as they are available.
     counter = 0
+    currentBP = -1
+    previousBP = -1
     while 1:
         line = sys.stdin.readline()
         if not line:
@@ -244,6 +223,17 @@ def calBPM():
                 oldTS  = TimeBuffer[i].popleft()
                 RSSBuffer[i].append(rss[i])
                 TimeBuffer[i].append(timeSec)
+                
+                # calculate the mean, variance, std for wl windows
+                meanBuffer[i].popleft()
+                meanBuffer[i].append(np.mean(list(RSSBuffer[i])[-wl:]))
+                
+                varBuffer[i].popleft()
+                varBuffer[i].append(np.var(list(RSSBuffer[i])[-wl:]))
+                
+                MSRBuffer[i].popleft()
+                MSRBuffer[i].append(0)
+                          
 
         # Every plotSkip rows, redraw the plot.  Time stamps, relative to the
         #   maximum time stamp, are on the x-axis.
@@ -255,11 +245,8 @@ def calBPM():
                 relTime = np.array(TimeBuffer[i]) - max(TimeBuffer[i])
                 linePlot[i].set_xdata(relTime)
                 mintime = min(min(relTime), mintime)
-            #ax1.set_axis([mintime, 0, -95, -35])
             ax1.set_xlim((mintime, 0))
             ax1.set_ylim((-95, -35))
-            #plt.axis([mintime, 0, -70, -35])
-            #plt.draw()
 
         #
         # 2.2 Put RSS values in rssMat.  Each row is a link.
@@ -269,88 +256,55 @@ def calBPM():
         # link-channels are logical "links", that is, each channel is its own link.
         linkchs, datalen = rssMat.shape
 
-        if counter > buffL:
+        # Breakpoints Removal
+        currentBP -= 1
+        if currentBP < -buffL:
+            currentBP = -buffL
 
+        previousBP -= 1
+        if previousBP < -buffL:
+            previousBP = -buffL
+
+
+        if counter > wl:
+            # Call calcTScoreRT
+            wl          = 14    # window length, samples
+            minStd      = 0.5   # avoid div-by-0 by having a minimum std deviation.
+            threshT     = 1.5
+            rmsTSum     = CalcTScoreRT(meanBuffer, varBuffer, wl, minStd)
+            if rmsTSum > threshT:
+                # set current breakpoint
+                previousBP = currentBP
+                currentBP = -wl
+                
+                # calculate the new mean from previous breakpoint until now
+                for i in range(linkchs):
+                    MSRBuffer[i] = deque(
+                        list(MSRBuffer[i])[:previousBP] +
+                        list(list(RSSBuffer[i])[previousBP:currentBP+1] - np.mean(list(RSSBuffer[i])[previousBP:currentBP+1])) +
+                        list(MSRBuffer[i])[currentBP+1:]
+                        )
+
+        if counter == buffL+1:
             #
             # 3. Calculate the sampling period, window lengths, and DTFT matrix
             #
             #run_duration = float(TimeBuffer[0][-1]) - float(TimeBuffer[0][0])
             #sampling_period = run_duration / (datalen-1)  # seconds per sample, hard code if known.
-            sampling_period = np.max([float(TimeBuffer[i][-1]) - float(TimeBuffer[i][0]) for i in range(len(TimeBuffer))])/buffL
-            sps          = 1.0 / sampling_period          # samples per second
-            #N            = int(round(window_s * sps))     # samples per rate estimation window
-            N            = buffL
-            #incr_samp    = int(round(increment_s * sps))  # How many samples to move the window before re-estimating
-            freqRange    = (-2J * np.pi / sps)*HzRange    #normalized frequency
-            freqs        = len(freqRange)                 # How many frequencies at which DFT is calculated
-            # We'll multiply this by the data in the window to calculate PSD
-            expMat       = np.array([np.exp(freqRange*i) for i in np.arange(N)])
+            sampling_period = np.average([  np.median([float(TimeBuffer[i][j]) - float(TimeBuffer[i][j-1]) for j in range(1,buffL)]) for i in range(len(TimeBuffer))])
+            expMat = calcExpMatrix(sampling_period, buffL, HzRange)
 
-            #
-            # 4. Compute the samples at which the RSS suddenly changes, which we call "breakpoints".
-            #
-            if breakptMeanSubtraction == 'common':
-                wl          = 14    # window length, samples
-                minStd      = 0.5   # avoid div-by-0 by having a minimum std deviation.
-                absTSum, rmsTSum, twoGrpT, maxT = CalcTScore(rssMat, wl, minStd)
+        elif counter > buffL+1:
+            # New sampling periods
+            sampling_period_new = np.average([  np.median([float(TimeBuffer[i][j]) - float(TimeBuffer[i][j-1]) for j in range(1,buffL)]) for i in range(len(TimeBuffer))])
+            if (sampling_period_new - sampling_period)/sampling_period > 0.0001:
+                expMat = calcExpMatrix(sampling_period_new, buffL, HzRange)
 
-                threshT = 1.5
-                breakpts = set( np.argwhere(rmsTSum > threshT).flatten() )
-                #print "Number of breakpoints: " + str(len(breakpts))
-
-            elif breakptMeanSubtraction == 'wilcoxon':
-                wl          = 14    # window length, samples
-                absZSum, rmsZSum     = CalcWilcoxonScore(rssMat, wl)
-                threshZ     = 1.15
-                breakpts    = set( np.argwhere(rmsZSum > threshZ).flatten() )
-                #print "Number of breakpoints: " + str(len(breakpts))
-
-            elif breakptMeanSubtraction == 'cusum':
-                wl          = 14    # window length, samples
-                minStd      = 0.5   # avoid div-by-0 by having a minimum std deviation.
-                k           = 1.2 # hand-chosen for sofa test for minStd = 0.5
-                #print 'k = ' + str(k)
-                MC2 = CalcMultivariateCUSUMChart2(rssMat, wl, minStd, k)
-                threshT = 0.0
-                breakpts = set( np.argwhere(MC2 > threshT).flatten() )
-                #print "Number of breakpoints: " + str(len(breakpts))
-
-            elif breakptMeanSubtraction == 'link':
-                wl          = 14    # window length, samples
-                minStd      = 0.5   # avoid div-by-0 by having a minimum std deviation.
-                absTSum, rmsTSum, twoGrpT, maxT = CalcTScore(rssMat, wl, minStd)
-                absTwoGrpT  = abs(twoGrpT)
-                threshT     = float(stats.scoreatpercentile(flatten(absTwoGrpT), 90.0))
-                breakpts    = []
-                for lc in range(linkchs):
-                    breakpts.append(set( np.argwhere(twoGrpT[lc, :] > threshT).flatten() ))
-                #print "Number of breakpoints: " + str(len(breakpts))
-
-            elif breakptMeanSubtraction == 'false':
-                breakpts = []
-                #print "Number of breakpoints: " + str(len(breakpts))
-
-            """
-            # 4.1 Plot the values used to compute breakpoints, if desired.
-            if plotOption:
-                if breakptMeanSubtraction == 'false':
-                    # do nothing
-                    print "Doing nothing"
-                elif (breakptMeanSubtraction == 'common') or (breakptMeanSubtraction == 'link'):
-                    plt.figure(11)
-                    plt.clf()
-                    plt.plot(absTSum)
-                    plt.plot(rmsTSum)
-                    plt.plot(maxT/5.)
-                    plt.axis([0, len(rmsTSum), 0, max(maxT)/5.])
-                    plt.xticks(range(0,len(rmsTSum), 20))
-                    plt.grid()
-                else:
-                    plt.figure(11)
-                    plt.clf()
-                    plt.plot(MC2)
-                    plt.grid()
-            """
+            for i in range(linkchs):
+                MSRBuffer[i] = deque(
+                    list(MSRBuffer[i])[:currentBP+1] +
+                    list(list(RSSBuffer[i])[currentBP+1:] - np.mean(list(RSSBuffer[i])[currentBP+1:]))
+                    )
 
             #
             # 5.  For each window, subtract mean of RSS, remove 127 values,
@@ -358,10 +312,25 @@ def calBPM():
             #
 
             # Remove the 127 values, and the mean.
-            meanRemoved = removeMeanAndClean(rssMat, noMeastKey)
+            #meanRemoved = removeMeanAndClean(rssMat, noMeastKey)
+            meanRemoved = MSRBuffer
+
+            # Every plotSkip rows, redraw the plot.  Time stamps, relative to the
+            #   maximum time stamp, are on the x-axis.
+            counter += 1
+            if np.mod(counter, plotSkip) == 0:
+                mintime = 0
+                for i in range(streams):
+                    linePlot2[i].set_ydata(MSRBuffer[i])
+                    relTime = np.array(TimeBuffer[i]) - max(TimeBuffer[i])
+                    linePlot2[i].set_xdata(relTime)
+                    mintime = min(min(relTime), mintime)
+                ax4.set_xlim((mintime, 0))
+                ax4.set_ylim((-10, 10))
 
             # For this window of mean-removed RSS data, compute the frequency estimate
             FreqMS      = np.abs(np.dot(meanRemoved, expMat))**2.0 # Frequency mag sqr
+            N           = buffL
             sumFreqMS   = np.mean(FreqMS, axis=0) * (4.0/N)
             fHatInd     = sumFreqMS.argmax()
             fHat.append(HzRange[fHatInd])
@@ -370,42 +339,9 @@ def calBPM():
             # Calculate performance of fHat estimate
             fError      = np.append(fError, (fHat[-1] - const_breathing_rate))
 
-            # Output the results.
-            #print 'Frequency estimate: ' + str(fHat[-1]*60.) + ' breaths per minute'
-            #print 'Frequency error: ' + str(fError[-1]*60.) + ' breaths per minute'
-
-            """
-            # plot the results
-            if plotOption:
-
-                # Plot the Average PSD plot
-                plt.figure(2)
-                plt.clf()
-                plt.plot(HzRange, sumFreqMS)
-                plt.plot(HzRange[fHatInd], sumFreqMS[fHatInd],'ro')
-                plt.xlabel('Frequency (Hz)')
-                plt.ylabel('Normalized Average PSD')
-
-                plt.figure(3)
-                plt.clf()
-                plt.plot(range(start_ind, start_ind + N), meanRemoved.T)
-                plt.grid()
-                plt.xlim(start_ind, start_ind+N-1)
-                plt.xlabel('Sample Time Index', fontsize=18)
-                plt.ylabel('Mean-Subtracted RSS (dB)', fontsize=18)
-
-                plt.draw()
-                #raw_input()  # pause for user to hit Enter
-            """
-
             # Compute average error
             fHatRMSE        = np.sqrt(np.mean(fError**2))
             fHatAvg         = np.mean(np.abs(fError))
-
-            #print 'fHatRMSE = ' + str(fHatRMSE)
-            #print 'bpm Avg = ' + str(np.average(fHat)*60.0)
-            #print 'bpm RMS Err = ' + str(fHatRMSE * 60.0)
-            #print 'bpm Avg Err = ' + str(fHatAvg * 60.0)
 
             if fileOption:
                 # <Second> <frequency estimate> <frequency error> <bpm avg> <RMSE> <Avg Err>

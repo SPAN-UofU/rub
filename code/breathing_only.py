@@ -6,25 +6,25 @@ import sys
 import matplotlib.pyplot as plt
 
 import matplotlib
-matplotlib.rc('xtick', labelsize=16) 
-matplotlib.rc('ytick', labelsize=16) 
+matplotlib.rc('xtick', labelsize=16)
+matplotlib.rc('ytick', labelsize=16)
 
 
 
 
 def plotHighestLinkLines(topInds, nodeLocs, channels):
-  
+
     nodes = nodeLocs.shape[0]
     for i in topInds:
         tx, rx, ch = txRxChForLinkNum(i, nodes, channels)
-        plt.plot([nodeLocs[tx,0], nodeLocs[rx,0]], 
+        plt.plot([nodeLocs[tx,0], nodeLocs[rx,0]],
                  [nodeLocs[tx,1], nodeLocs[rx,1]])
     plt.grid()
 
 
 # Plot some random link-channels (rows) of the input matrix
 def plotLinks(rssDataMat, k):
-  
+
     for i in random.sample(range(rssDataMat.shape[0]), k):
         plt.plot(rssDataMat[i,:])
     plt.grid()
@@ -32,7 +32,7 @@ def plotLinks(rssDataMat, k):
 
 # Plot the link-channels (rows) of the input matrix with highest "value"
 def plotHighestLinks(rssDataMat, value, k, start_ind):
-  
+
     topInds = argsort(value)[-1:-k-1:-1]
     lendata = rssDataMat.shape[1]
     for i in topInds:
@@ -45,11 +45,11 @@ def plotHighestLinks(rssDataMat, value, k, start_ind):
 
     return topInds
 
-# Calculate the t-score, for each link, for the change in mean between 
+# Calculate the t-score, for each link, for the change in mean between
 # the past vs. future window, at each time.
 def CalcTScore(rssMat, wl, minStd):
 
-    # Calculate the mean and standard deviation of each wl-length window 
+    # Calculate the mean and standard deviation of each wl-length window
     linkchs, datalen = rssMat.shape
     rssWinAvg   = np.empty((linkchs, datalen-wl))
     rssWinVar   = np.empty((linkchs, datalen-wl))
@@ -72,11 +72,11 @@ def CalcTScore(rssMat, wl, minStd):
 
     return (absTSum, rmsTSum, twoGrpT, maxT)
 
-# Calculate the Mann-Whitney-Wilcoxon U statistic, for each link, for the 
+# Calculate the Mann-Whitney-Wilcoxon U statistic, for each link, for the
 # change in distribution between the past vs. future window, at each time.
 def CalcWilcoxonScore(rssMat, wl):
 
-    # Calculate the mean and standard deviation of each wl-length window 
+    # Calculate the mean and standard deviation of each wl-length window
     linkchs, datalen = rssMat.shape
 
     # There are two windows, one before the current time, one after.
@@ -100,7 +100,7 @@ def removeMeanAndClean(rssMat, noMeastKey):
     # Find the mean of each row. Repeat it to make matrix of same size
     for lc in range(linkchs):
         linkr          = rssMat[lc,:]
-        
+
         # RSS values >= noMeastKey mean data was not measured.
         # Do not include noMeastKey values in mean; and set those values to 0.
         missing_data   = np.where(linkr >= noMeastKey)
@@ -112,15 +112,15 @@ def removeMeanAndClean(rssMat, noMeastKey):
 
 # Subtract the mean from each link between start index "si" and end index "ei".
 # However, there may be other breakpoints between si and ei.
-# Do not calculate the mean across breakpoint boundaries.  
+# Do not calculate the mean across breakpoint boundaries.
 def brokenSubtractMean(rssMat, si, ei, breakpts):
-    
+
     # Create a copy of the array where the mean will be subtracted
-    temp     = rssMat[:, si:ei].copy()  
+    temp     = rssMat[:, si:ei].copy()
     linkchs  = rssMat.shape[0]
     # Subtract the mean for each link-channel
     for lc in range(linkchs):
-        # The complete list of breakpoints includes si, ei, and any 
+        # The complete list of breakpoints includes si, ei, and any
         # breakpoint between si and ei.  Sort this set to make it a list
         inds = sorted((breakpts[lc] & set(range(si, ei))) | set([si, ei]) )
         # Compute and subtract the mean for each period between breakpoints
@@ -133,16 +133,16 @@ def brokenSubtractMean(rssMat, si, ei, breakpts):
 
 # Subtract the mean from each link between start index "si" and end index "ei".
 # However, there may be other breakpoints between si and ei.
-# Do not calculate the mean across breakpoint boundaries.  
+# Do not calculate the mean across breakpoint boundaries.
 # This function uses the same breakpoints across all links.
 def brokenSubtractMeanCommon(rssMat, si, ei, breakpts):
-    
-    # The complete list of breakpoints includes si, ei, and any 
+
+    # The complete list of breakpoints includes si, ei, and any
     # breakpoint between si and ei.  Sort this set to make it a list
     inds = sorted((breakpts & set(range(si, ei))) | set([si, ei]) )
-    
+
     # Create a copy of the array where the mean will be subtracted
-    temp     = rssMat[:, si:ei].copy()  
+    temp     = rssMat[:, si:ei].copy()
     linkchs  = rssMat.shape[0]
     # Subtract the link-channel mean from each link-channel's data
     # Compute and subtract the mean for each period between breakpoints
@@ -150,7 +150,7 @@ def brokenSubtractMeanCommon(rssMat, si, ei, breakpts):
         scurr = inds[i] - si
         ecurr = inds[i+1] - si
         durationSamps = ecurr-scurr
-        mu            = tile(mean(temp[:, scurr:ecurr], axis=1).reshape(linkchs, 
+        mu            = tile(mean(temp[:, scurr:ecurr], axis=1).reshape(linkchs,
                              1), durationSamps)
         temp[:, scurr:ecurr] -= mu
 
@@ -175,7 +175,7 @@ def flatten(inArray):
 #
 # 1. Inputs to the script.
 #
-dirname      = './'
+dirname      = '../prelimTest/'
 filename     = 'breathing_2.txt'
 startskip    = 460  # Skip the first "startskip" rows
 endskip      = 150  # Skip the last "endskip" rows.
@@ -247,8 +247,8 @@ print len(HzRange)
 if breakptMeanSubtraction == 'common':
     wl          = 14    # window length, samples
     minStd      = 0.5   # avoid div-by-0 by having a minimum std deviation.
-    absTSum, rmsTSum, twoGrpT, maxT = CalcTScore(rssMat, wl, minStd)        
-    
+    absTSum, rmsTSum, twoGrpT, maxT = CalcTScore(rssMat, wl, minStd)
+
     threshT = 1.5
     breakpts = set( np.argwhere(rmsTSum > threshT).flatten() )
     print "Number of breakpoints: " + str(len(breakpts))
@@ -269,7 +269,7 @@ elif breakptMeanSubtraction == 'cusum':
     threshT = 0.0
     breakpts = set( argwhere(MC2 > threshT).flatten() )
     print "Number of breakpoints: " + str(len(breakpts))
-    
+
 elif breakptMeanSubtraction == 'link':
     wl          = 14    # window length, samples
     minStd      = 0.5   # avoid div-by-0 by having a minimum std deviation.
@@ -304,8 +304,8 @@ if plotOption:
         plt.clf()
         plt.plot(MC2)
         plt.grid()
-        
-            
+
+
 #
 # 5.  For each window, subtract mean of RSS, remove 127 values,
 #     compute the frequency estimate and its error
@@ -337,7 +337,7 @@ for ro, start_ind in enumerate(start_ind_list):
     fHat[ro]    = HzRange[fHatInd]
     # Calculate performance of fHat estimate
     fError[ro]  = (fHat[ro] - const_breathing_rate)
-    
+
     # Output the results.
     print 'Frequency estimate: ' + str(fHat[ro]*60.) + ' breaths per minute'
     print 'Frequency error: ' + str(fError[ro]*60.) + ' breaths per minute'
@@ -363,7 +363,7 @@ for ro, start_ind in enumerate(start_ind_list):
         plt.ylabel('Mean-Subtracted RSS (dB)', fontsize=18)
 
         raw_input()  # pause for user to hit Enter
-        
+
 
 # Compute average error
 fHatRMSE        = np.sqrt(np.mean(fError**2))

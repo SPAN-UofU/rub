@@ -1,0 +1,41 @@
+Metronome  Copyright (C) 2011 Piotr Stankiewicz
+This program comes with ABSOLUTELY NO WARRANTY
+This is free software, and you are welcome to redistribute it
+under certain conditions.
+Start time: 1418842596.93306
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842596.99005
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842600.98652
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842604.98311
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842608.98227
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842612.97682
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842616.96966
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842620.96784
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842624.96603
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842628.96456
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842632.95846
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842636.95003
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842640.94568
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842644.93923
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842648.93931
+BPM: 30 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842652.93658
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842656.93011
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842659.92546
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842662.92079
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842665.91821
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842668.91123
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842671.90675
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842674.90198
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842677.89757
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842680.89266
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842683.89005
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842686.88304
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842689.87833
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842692.87469
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842695.86899
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842698.86413
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842701.86165
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842704.85556
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842707.85084
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842710.84539
+BPM: 40 - Metrum 2/4 - Accent: yes - Repeats: 1 - Time: 1418842713.84063
+Stop time: 1418842716.83695
