@@ -16,7 +16,7 @@ matplotlib.rc('ytick', labelsize=16)
 plt.ion()
 
 plotOption   = None
-fileOption   = True
+fileOption   = False
 
 
 # Plot highest link lines
@@ -121,8 +121,7 @@ def calBPM():
     #              which were saved from the previous experiment run.
     #              ** Must be greater than 0.
     plotSkip    = 5
-    buffL       = 600 #30 sec
-    avgL        = 100 #10 sec
+    buffL       = 200 #600 #30 sec
     startSkip   = 1
 
     # Init output file
@@ -160,17 +159,17 @@ def calBPM():
     for n in range(streams):
         RSSBuffer.append( deque([rss[n]] * buffL))
         TimeBuffer.append( deque([timeSec] * buffL))
-        
+
         varBuffer.append( deque([0] * (wl + 1)))
         meanBuffer.append( deque([0] * (wl + 1)))
         MSRBuffer.append( deque([rss[n]] * buffL))
-        
+
         l, = ax1.plot([0]*buffL, RSSBuffer[n], label=str(n))
         ax1.set_ylim((-95, -35))
         ax1.set_ylabel('Received Power (dBm)')
         ax1.set_xlabel('Measurement Time Ago (sec)')
         linePlot.append(l)
-        
+
         l, = ax4.plot([0]*buffL, MSRBuffer[n], label=str(n))
         ax4.set_ylim((-10, 10))
         ax4.set_ylabel('Mean-Subtracted RSS (dB)')
@@ -184,15 +183,17 @@ def calBPM():
     ax2.set_ylabel('Breath per Minute (BPM)')
     ax2.set_xlabel('Measurement Time Ago (sec)')
     plotBuffer2 = l
+    ax2.grid()
 
     ax3 = fig1.add_subplot(4, 1, 3)
     FBuffer2 = (deque([0] * len(HzRange)))
-    freq, = ax3.plot(HzRange, FBuffer2)
+    freq, = ax3.plot(HzRange*60, FBuffer2)
     maxFreq, = ax3.plot(0, 0,'ro')
-    ax3.set_xlim((Min_RR, Max_RR))
+    ax3.set_xlim((Min_RR*60, Max_RR*60))
     ax3.set_ylim((0, 15))
-    ax3.set_xlabel('Frequency (Hz)')
+    ax3.set_xlabel('Frequency (1/min)')
     ax3.set_ylabel('Normalized Average PSD')
+    ax3.grid()
 
     # Init fHat and fError array
     fHat           = deque([])
@@ -225,17 +226,17 @@ def calBPM():
                     oldTS  = TimeBuffer[i].popleft()
                     RSSBuffer[i].append(rss[i])
                     TimeBuffer[i].append(timeSec)
-                    
+
                     # calculate the mean, variance, std for wl windows
                     meanBuffer[i].popleft()
                     meanBuffer[i].append(np.mean(list(RSSBuffer[i])[-wl:]))
-                    
+
                     varBuffer[i].popleft()
                     varBuffer[i].append(np.var(list(RSSBuffer[i])[-wl:]))
-                    
+
                     MSRBuffer[i].popleft()
                     MSRBuffer[i].append(0)
-                              
+
 
             # Every plotSkip rows, redraw the plot.  Time stamps, relative to the
             #   maximum time stamp, are on the x-axis.
@@ -275,9 +276,16 @@ def calBPM():
                     # set current breakpoint
                     previousBP = currentBP
                     currentBP = -wl
-                    
+
                     # calculate the new mean from previous breakpoint until now
                     for i in range(linkchs):
+                        """
+                        MSRBuffer[i] = deque(
+                            list(MSRBuffer[i])[:previousBP] +
+                            list( [0] * (abs(currentBP+1-previousBP))) +
+                            list(MSRBuffer[i])[currentBP+1:]
+                            )
+                        """
                         MSRBuffer[i] = deque(
                             list(MSRBuffer[i])[:previousBP] +
                             list(list(RSSBuffer[i])[previousBP:currentBP+1] - np.mean(list(RSSBuffer[i])[previousBP:currentBP+1])) +
@@ -288,12 +296,12 @@ def calBPM():
                 # Calculate the sampling period, window lengths, and DTFT matrix
                 #run_duration = float(TimeBuffer[0][-1]) - float(TimeBuffer[0][0])
                 #sampling_period = run_duration / (datalen-1)  # seconds per sample, hard code if known.
-                sampling_period = np.average([  np.median([float(TimeBuffer[i][j]) - float(TimeBuffer[i][j-1]) for j in range(1,buffL)]) for i in range(len(TimeBuffer))])
+                sampling_period = np.max([  np.median([float(TimeBuffer[i][j]) - float(TimeBuffer[i][j-1]) for j in range(1,buffL)]) for i in range(len(TimeBuffer))])
                 expMat = calcExpMatrix(sampling_period, buffL, HzRange)
 
             elif counter > buffL+1:
                 # New sampling periods
-                sampling_period_new = np.average([  np.median([float(TimeBuffer[i][j]) - float(TimeBuffer[i][j-1]) for j in range(1,buffL)]) for i in range(len(TimeBuffer))])
+                sampling_period_new = np.max([  np.median([float(TimeBuffer[i][j]) - float(TimeBuffer[i][j-1]) for j in range(1,buffL)]) for i in range(len(TimeBuffer))])
                 if (sampling_period_new - sampling_period)/sampling_period > 0.0001:
                     expMat = calcExpMatrix(sampling_period_new, buffL, HzRange)
 
@@ -312,10 +320,13 @@ def calBPM():
                 sumFreqMS   = np.mean(FreqMS, axis=0) * (4.0/N)
                 fHatInd     = sumFreqMS.argmax()
                 fHat.append(HzRange[fHatInd])
-                if len(fHat) > avgL:
+                if len(fHat) > buffL:
                     fHat.popleft()
                 oldF  = FBuffer.popleft()
-                FBuffer.append(fHat[-1]*60.0)
+                if rmsTSum < threshT:
+                    FBuffer.append(fHat[-1]*60.0)
+                else:
+                    FBuffer.append(float('inf'))
 
                 # Every plotSkip rows, redraw the plot.  Time stamps, relative to the
                 #   maximum time stamp, are on the x-axis.
@@ -329,7 +340,7 @@ def calBPM():
                         mintime = min(min(relTime), mintime)
                     ax4.set_xlim((mintime, 0))
                     ax4.set_ylim((-10, 10))
-                    
+
                     # Update plot
                     plotBuffer2.set_ydata(FBuffer)
                     plotBuffer2.set_xdata(relTime)
@@ -337,7 +348,7 @@ def calBPM():
                     ax2.set_ylim((0, 40))
 
                     freq.set_ydata(sumFreqMS)
-                    maxFreq.set_xdata(HzRange[fHatInd])
+                    maxFreq.set_xdata(HzRange[fHatInd]*60)
                     maxFreq.set_ydata(sumFreqMS[fHatInd])
 
                     plt.draw()
@@ -361,7 +372,7 @@ def calBPM():
                     """
                     fout.write(str(timeSec) + " " + \
                         str(fHat[-1]*60.) + "\n")
-    
+
         except (KeyboardInterrupt, SystemExit):
             plt.close(fig1)
             quit()

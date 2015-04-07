@@ -29,11 +29,11 @@
 #      node hears few packets that arrive seemingly out of order.
 #
 # Version 1.2: 1 Sept 2014.
-#   a) Adds a column with the local PC clock time.  There is only one 
+#   a) Adds a column with the local PC clock time.  There is only one
 #      floating point clock time per row, we use the maximum time of the
 #      measurements on all the channels.
 #   b) Common functions are now in python library rss.py.
-#      
+#
 
 import time
 import rss
@@ -42,8 +42,8 @@ import sys
 
 # What channels are measured by your nodes, in order of their measurement?
 # USER:  SET THIS TO THE CHANNELS IN YOUR CHANNEL GROUP
-channelList   = [26, 11, 16, 21]
-#channelList   = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+#channelList   = [25, 15, 16, 26]
+channelList   = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
 
 # What node numbers are yours, that you want to see output to the file.
 # USER:  SET THIS TO THE NODE IDS ASSIGNED TO YOU.  DO NOT INCLUDE THE LISTEN NODE NUMBER
@@ -55,10 +55,10 @@ nodeList      = [1,2]
 # Examples:
 #linksToPlot = [ (5,6,22), (6,5,22), (5,6,26), (6,5,26)]
 #linksToPlot = [ (6,5,14), (6,5,18), (6,5,22), (6,5,26)]
-linksToPlot = [ (1,2,11), (1,2,16), (1,2,21), (1,2,26)]
+#linksToPlot = [ (1,2,15), (1,2,16), (1,2,25), (1,2,26)]
 #linksToPlot = [ (5,6,14), (5,6,18), (5,6,22), (5,6,26)]
 #linksToPlot = [ (1,2,11), (2,1,11)]
-#linksToPlot = [ (1,2,11), (1,2,12), (1,2,13), (1,2,14), (1,2,15), (1,2,16), (1,2,17), (1,2,18), (1,2,19), (1,2,20), (1,2,21), (1,2,22), (1,2,23), (1,2,24), (1,2,25), (1,2,26)]
+linksToPlot = [ (1,2,11), (1,2,12), (1,2,13), (1,2,14), (1,2,15), (1,2,16), (1,2,17), (1,2,18), (1,2,19), (1,2,20), (1,2,21), (1,2,22), (1,2,23), (1,2,24), (1,2,25), (1,2,26)]
 
 # Open the serial port at 38400 bits/sec.
 serial_filename = rss.serialFileName()
@@ -140,7 +140,7 @@ while(1):
 		    s = str(currentLinkTime[0]) + ' ' + str(currentLinkRSS[0])
 		    for n in range(1,len(linksToPlot)):
 		        s += ' ' + str(currentLinkTime[n]) + ' ' + str(currentLinkRSS[n])
-		    
+
 		    timeSecStr = ' {:.5f}'.format(max(currentLinkTimeSec))
 		    sys.stdout.write(s + timeSecStr + '\n')
 		    sys.stdout.flush()

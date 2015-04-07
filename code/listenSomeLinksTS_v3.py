@@ -42,13 +42,13 @@ import sys
 
 # What channels are measured by your nodes, in order of their measurement?
 # USER:  SET THIS TO THE CHANNELS IN YOUR CHANNEL GROUP
-channelList   = [26, 11, 16, 21]
-#channelList   = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+#channelList   = [26, 11, 16, 21]
+channelList   = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
 
 # What node numbers are yours, that you want to see output to the file.
 # USER:  SET THIS TO THE NODE IDS ASSIGNED TO YOU.  DO NOT INCLUDE THE LISTEN NODE NUMBER
-#nodeList      = [1,2]
-nodeList      = [1,2,3,4,5,6,7,8]
+nodeList      = [1,2]
+#nodeList      = [1,2,3,4,5,6,7,8]
 
 # A link is a (transmitter id, receiver id, channel number) combination.
 #    11 <= channel number <= 26, but is limited to those in "channelList"
@@ -59,7 +59,7 @@ nodeList      = [1,2,3,4,5,6,7,8]
 #linksToPlot = [ (1,2,11), (1,2,16), (1,2,21), (1,2,26)]
 #linksToPlot = [ (5,6,14), (5,6,18), (5,6,22), (5,6,26)]
 #linksToPlot = [ (1,2,11), (2,1,11)]
-#linksToPlot = [ (1,2,11), (1,2,12), (1,2,13), (1,2,14), (1,2,15), (1,2,16), (1,2,17), (1,2,18), (1,2,19), (1,2,20), (1,2,21), (1,2,22), (1,2,23), (1,2,24), (1,2,25), (1,2,26)]
+linksToPlot = [ (1,2,11), (1,2,12), (1,2,13), (1,2,14), (1,2,15), (1,2,16), (1,2,17), (1,2,18), (1,2,19), (1,2,20), (1,2,21), (1,2,22), (1,2,23), (1,2,24), (1,2,25), (1,2,26)]
 """
 linksToPlot = [ (1,2,11), (1,3,11), (1,4,11), (1,5,11), (1,6,11), (1,7,11), (1,8,11),
                           (2,3,11), (2,4,11), (2,5,11), (2,6,11), (2,7,11), (2,8,11),
@@ -90,7 +90,7 @@ linksToPlot = [ (1,2,11), (1,3,11), (1,4,11), (1,5,11), (1,6,11), (1,7,11), (1,8
                                                                   (6,7,26), (6,8,26),
                                                                             (7,8,26),]
 """
-linksToPlot = [ (6,8,11), (6,8,16), (6,8,21), (6,8,26)]
+#linksToPlot = [ (6,8,11), (6,8,16), (6,8,21), (6,8,26)]
 
 # Open the serial port at 38400 bits/sec.
 serial_filename = rss.serialFileName()
@@ -98,7 +98,7 @@ sys.stderr.write('Using USB port file: ' + serial_filename + '\n')
 ser = serial.Serial(serial_filename,38400)
 
 # How many nodes the sensors have as the max # nodes (what # they're programmed with)
-maxNodes      = 8
+maxNodes      = 2
 
 # Parameters that are due to our implementation of the listen node.
 numNodes      = len(nodeList)
@@ -129,9 +129,8 @@ while(1):
         if len(currentLine) != string_length:
             sys.stderr.write('packet corrupted - wrong string length\n')
             del currentLine[:]
-            continue
-    
-    sys.stderr.write(' '.join(currentLine)  + '\n')
+        continue
+    #sys.stderr.write(' '.join(currentLine)  + '\n')
     currentLineInt = [int(x, 16) for x in currentLine]
     rxId = currentLineInt[2]
     currentCh = currentLineInt[-4]
@@ -165,28 +164,28 @@ while(1):
 
         if (linksToPlot.count((txId, rxId, ch)) > 0):
             i = linksToPlot.index((txId, rxId, ch))
-        # If the RSS has already been recorded for this link on
-        # this "line", then output the line first, and then restart
-        # with a new line.
-        if currentLinkRSS[i] < noMeasurementKey:
-            # Output currentLinkRSS & currentLinkTime vectors
-            s = str(currentLinkTime[0]) + ' ' + str(currentLinkRSS[0])
-            for n in range(1,len(linksToPlot)):
-                s += ' ' + str(currentLinkTime[n]) + ' ' + str(currentLinkRSS[n])
+            # If the RSS has already been recorded for this link on
+            # this "line", then output the line first, and then restart
+            # with a new line.
+            if currentLinkRSS[i] < noMeasurementKey:
+                # Output currentLinkRSS & currentLinkTime vectors
+                s = str(currentLinkTime[0]) + ' ' + str(currentLinkRSS[0])
+                for n in range(1,len(linksToPlot)):
+                    s += ' ' + str(currentLinkTime[n]) + ' ' + str(currentLinkRSS[n])
 
-            timeSecStr = ' {:.5f}'.format(max(currentLinkTimeSec))
-            sys.stdout.write(s + timeSecStr + '\n')
-            sys.stdout.flush()
-            # Restart with a new line by resetting currentLinkRSS and
-            # currentLinkTime
-            currentLinkRSS  = [noMeasurementKey] * len(linksToPlot)
-            currentLinkTime = [0] * len(linksToPlot)
-            currentLinkTimeSec = [0.0] * len(linksToPlot)
+                timeSecStr = ' {:.5f}'.format(max(currentLinkTimeSec))
+                sys.stdout.write(s + timeSecStr + '\n')
+                sys.stdout.flush()
+                # Restart with a new line by resetting currentLinkRSS and
+                # currentLinkTime
+                currentLinkRSS  = [noMeasurementKey] * len(linksToPlot)
+                currentLinkTime = [0] * len(linksToPlot)
+                currentLinkTimeSec = [0.0] * len(linksToPlot)
 
-        # Store the RSS & time it was recorded.
-        currentLinkRSS[i] = rss.hex2signedint(currentLine[rssIndex+txId-1])
-        currentLinkTime[i] = prevTimeForTxId[txId]
-        currentLinkTimeSec[i] = prevTimeSecForTxId[txId]
+            # Store the RSS & time it was recorded.
+            currentLinkRSS[i] = rss.hex2signedint(currentLine[rssIndex+txId-1])
+            currentLinkTime[i] = prevTimeForTxId[txId]
+            currentLinkTimeSec[i] = prevTimeSecForTxId[txId]
 
-    # Remove serial data from the buffer.
-    currentLine = []
+        # Remove serial data from the buffer.
+        currentLine = []
