@@ -110,7 +110,7 @@ def calBPM():
     increment_s  = 5        # seconds of window overlap, seconds
     Min_RR       = 0.1      # Minimum breathing rate, Hz
     Delta_RR     = 0.002    # Granularity of spectrum estimate
-    Max_RR       = 0.4      # Maximum breathing rate, Hz
+    Max_RR       = 0.6      # Maximum breathing rate, Hz
 
     HzRange      = np.arange(Min_RR, Max_RR, Delta_RR)  # Frequencies at which freq content is calc'ed.
 
@@ -190,7 +190,7 @@ def calBPM():
     freq, = ax3.plot(HzRange*60, FBuffer2)
     maxFreq, = ax3.plot(0, 0,'ro')
     ax3.set_xlim((Min_RR*60, Max_RR*60))
-    ax3.set_ylim((0, 15))
+    ax3.set_ylim((0, 30))
     ax3.set_xlabel('Frequency (1/min)')
     ax3.set_ylabel('Normalized Average PSD')
     ax3.grid()
@@ -221,21 +221,26 @@ def calBPM():
             # Append the queue for each stream with the newest RSS and Timestamps
             for i in range(streams):
                 # data > -10 indicates no data measured.  Don't include a new value.
+                
+                oldRSS = RSSBuffer[i].popleft()
+                oldTS  = TimeBuffer[i].popleft()
+                
                 if (rss[i] < -10):
-                    oldRSS = RSSBuffer[i].popleft()
-                    oldTS  = TimeBuffer[i].popleft()
                     RSSBuffer[i].append(rss[i])
-                    TimeBuffer[i].append(timeSec)
+                else:
+                    RSSBuffer[i].append(RSSBuffer[i][-1])
+                
+                TimeBuffer[i].append(timeSec)
 
-                    # calculate the mean, variance, std for wl windows
-                    meanBuffer[i].popleft()
-                    meanBuffer[i].append(np.mean(list(RSSBuffer[i])[-wl:]))
+                # calculate the mean, variance, std for wl windows
+                meanBuffer[i].popleft()
+                meanBuffer[i].append(np.mean(list(RSSBuffer[i])[-wl:]))
 
-                    varBuffer[i].popleft()
-                    varBuffer[i].append(np.var(list(RSSBuffer[i])[-wl:]))
+                varBuffer[i].popleft()
+                varBuffer[i].append(np.var(list(RSSBuffer[i])[-wl:]))
 
-                    MSRBuffer[i].popleft()
-                    MSRBuffer[i].append(0)
+                MSRBuffer[i].popleft()
+                MSRBuffer[i].append(0)
 
 
             # Every plotSkip rows, redraw the plot.  Time stamps, relative to the
@@ -323,7 +328,7 @@ def calBPM():
                 if len(fHat) > buffL:
                     fHat.popleft()
                 oldF  = FBuffer.popleft()
-                if rmsTSum < threshT:
+                if (rmsTSum < threshT) & (sumFreqMS[fHatInd] > 5):
                     FBuffer.append(fHat[-1]*60.0)
                 else:
                     FBuffer.append(float('inf'))
